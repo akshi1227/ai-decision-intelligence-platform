@@ -1,0 +1,594 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: Decision IQ — AI Decision Intelligence Platform API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: sessions
+    description: Analysis sessions
+  - name: documents
+    description: Documents within a session
+  - name: analyses
+    description: Multi-agent analyses
+  - name: chat
+    description: RAG-style chat over session documents
+  - name: dashboard
+    description: Dashboard summaries
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /ai/dashboard:
+    get:
+      operationId: getDashboard
+      tags: [dashboard]
+      summary: Dashboard overview
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /ai/sessions:
+    get:
+      operationId: listSessions
+      tags: [sessions]
+      summary: List analysis sessions
+      responses:
+        "200":
+          description: Sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Session"
+    post:
+      operationId: createSession
+      tags: [sessions]
+      summary: Create a new analysis session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+
+  /ai/sessions/{sessionId}:
+    get:
+      operationId: getSession
+      tags: [sessions]
+      summary: Get a session with documents, analyses, and messages
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Session detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionDetail"
+    delete:
+      operationId: deleteSession
+      tags: [sessions]
+      summary: Delete a session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /ai/sessions/{sessionId}/documents:
+    post:
+      operationId: addDocument
+      tags: [documents]
+      summary: Add a document (text, csv, or pdf-extracted text) to a session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddDocumentBody"
+      responses:
+        "201":
+          description: Document added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+
+  /ai/sessions/{sessionId}/documents/{documentId}:
+    delete:
+      operationId: deleteDocument
+      tags: [documents]
+      summary: Delete a document
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /ai/sessions/{sessionId}/analyze:
+    post:
+      operationId: runAnalysis
+      tags: [analyses]
+      summary: Run a multi-agent decision analysis over the session's documents
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunAnalysisBody"
+      responses:
+        "200":
+          description: Analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Analysis"
+
+  /ai/sessions/{sessionId}/analyses:
+    get:
+      operationId: listAnalyses
+      tags: [analyses]
+      summary: List analyses for a session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Analyses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Analysis"
+
+  /ai/sessions/{sessionId}/chat:
+    post:
+      operationId: sendChatMessage
+      tags: [chat]
+      summary: Ask a question about the session's documents (RAG)
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendChatBody"
+      responses:
+        "200":
+          description: Chat reply with sources
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatReply"
+
+  /ai/sessions/{sessionId}/messages:
+    get:
+      operationId: listMessages
+      tags: [chat]
+      summary: Get chat history for a session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatMessage"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required: [status]
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        domain:
+          type: string
+          description: Free-form context, e.g. "Sales pipeline review"
+        createdAt:
+          type: string
+          format: date-time
+        documentCount:
+          type: integer
+        analysisCount:
+          type: integer
+      required: [id, title, domain, createdAt, documentCount, analysisCount]
+
+    CreateSessionBody:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+        domain:
+          type: string
+      required: [title]
+
+    DocumentKind:
+      type: string
+      enum: [text, csv, pdf]
+
+    Document:
+      type: object
+      properties:
+        id:
+          type: integer
+        sessionId:
+          type: integer
+        name:
+          type: string
+        kind:
+          $ref: "#/components/schemas/DocumentKind"
+        content:
+          type: string
+        charCount:
+          type: integer
+        summary:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, sessionId, name, kind, content, charCount, createdAt]
+
+    AddDocumentBody:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        kind:
+          $ref: "#/components/schemas/DocumentKind"
+        content:
+          type: string
+          minLength: 1
+      required: [name, kind, content]
+
+    AgentOutput:
+      type: object
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+        thinking:
+          type: string
+        findings:
+          type: array
+          items:
+            type: string
+      required: [name, role, thinking, findings]
+
+    Recommendation:
+      type: object
+      properties:
+        title:
+          type: string
+        rationale:
+          type: string
+        priority:
+          type: string
+          enum: [high, medium, low]
+      required: [title, rationale, priority]
+
+    Risk:
+      type: object
+      properties:
+        title:
+          type: string
+        likelihood:
+          type: string
+          enum: [high, medium, low]
+        impact:
+          type: string
+          enum: [high, medium, low]
+        mitigation:
+          type: string
+      required: [title, likelihood, impact, mitigation]
+
+    KeyMetric:
+      type: object
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+        trend:
+          type: string
+          enum: [up, down, flat, unknown]
+      required: [label, value, trend]
+
+    ChartPoint:
+      type: object
+      properties:
+        label:
+          type: string
+        value:
+          type: number
+      required: [label, value]
+
+    Chart:
+      type: object
+      properties:
+        title:
+          type: string
+        type:
+          type: string
+          enum: [bar, line, pie]
+        points:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChartPoint"
+      required: [title, type, points]
+
+    Analysis:
+      type: object
+      properties:
+        id:
+          type: integer
+        sessionId:
+          type: integer
+        focus:
+          type: string
+        decision:
+          type: string
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        summary:
+          type: string
+        agents:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentOutput"
+        keyMetrics:
+          type: array
+          items:
+            $ref: "#/components/schemas/KeyMetric"
+        recommendations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Recommendation"
+        risks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Risk"
+        charts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Chart"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - sessionId
+        - focus
+        - decision
+        - confidence
+        - summary
+        - agents
+        - keyMetrics
+        - recommendations
+        - risks
+        - charts
+        - createdAt
+
+    RunAnalysisBody:
+      type: object
+      properties:
+        focus:
+          type: string
+          minLength: 1
+          description: The decision question or focus area for the agents.
+      required: [focus]
+
+    ChatSource:
+      type: object
+      properties:
+        documentId:
+          type: integer
+        documentName:
+          type: string
+        excerpt:
+          type: string
+      required: [documentId, documentName, excerpt]
+
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        sessionId:
+          type: integer
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatSource"
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, sessionId, role, content, sources, createdAt]
+
+    ChatReply:
+      type: object
+      properties:
+        userMessage:
+          $ref: "#/components/schemas/ChatMessage"
+        assistantMessage:
+          $ref: "#/components/schemas/ChatMessage"
+      required: [userMessage, assistantMessage]
+
+    SendChatBody:
+      type: object
+      properties:
+        question:
+          type: string
+          minLength: 1
+      required: [question]
+
+    SessionDetail:
+      type: object
+      properties:
+        session:
+          $ref: "#/components/schemas/Session"
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/Document"
+        analyses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Analysis"
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatMessage"
+      required: [session, documents, analyses, messages]
+
+    DashboardActivity:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [session, document, analysis, chat]
+        title:
+          type: string
+        sessionId:
+          type: integer
+        sessionTitle:
+          type: string
+        at:
+          type: string
+          format: date-time
+      required: [kind, title, sessionId, sessionTitle, at]
+
+    DashboardSummary:
+      type: object
+      properties:
+        totalSessions:
+          type: integer
+        totalDocuments:
+          type: integer
+        totalAnalyses:
+          type: integer
+        totalMessages:
+          type: integer
+        avgConfidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        decisionsByConfidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChartPoint"
+        documentsByKind:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChartPoint"
+        recentActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardActivity"
+        recentSessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Session"
+      required:
+        - totalSessions
+        - totalDocuments
+        - totalAnalyses
+        - totalMessages
+        - avgConfidence
+        - decisionsByConfidence
+        - documentsByKind
+        - recentActivity
+        - recentSessions
